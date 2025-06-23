@@ -4,22 +4,15 @@ from typing import Dict
 import torch
 import io
 import os
-import webbrowser
-import threading
 from PIL import Image
 
-# Local module imports
+# Local imports
 from ocr_proc import extract_meter_info
 from inference_roof_type import RoofClassifierCNN, transform, CLASS_NAMES, DEVICE
 
-# Ensure any required directories exist
-os.makedirs("training", exist_ok=True)
-
-# -------------------------------
-# FastAPI App Setup
-# -------------------------------
+# FastAPI app
 app = FastAPI(
-    title="Unified ML API",
+    title="Electric Meter + Roof Classifier API",
     description="Electric Meter OCR and Roof Type Classification",
     version="1.0.0",
     docs_url="/docs",
@@ -27,31 +20,20 @@ app = FastAPI(
     openapi_url="/openapi.json"
 )
 
-# -------------------------------
 # Redirect root to Swagger UI
-# -------------------------------
 @app.get("/", include_in_schema=False)
 async def root():
-    """Redirect to SwaggerUI"""
     return RedirectResponse(url="/docs")
 
-# -------------------------------
-# Health Check
-# -------------------------------
 @app.get("/health", tags=["Health"])
 async def health_check():
     return {"status": "healthy", "message": "API is running"}
 
-# -------------------------------
-# Load Roof Classifier Model
-# -------------------------------
+# Load the roof model once (on cold start)
 roof_model = RoofClassifierCNN().to(DEVICE)
 roof_model.load_state_dict(torch.load("roof_type_cnn_best.pth", map_location=DEVICE))
 roof_model.eval()
 
-# -------------------------------
-# Endpoint: Electric Meter OCR
-# -------------------------------
 @app.post("/ocr/meter", tags=["OCR"])
 async def extract_ocr_data(file: UploadFile = File(...)) -> Dict:
     try:
@@ -61,9 +43,6 @@ async def extract_ocr_data(file: UploadFile = File(...)) -> Dict:
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"OCR processing failed: {str(e)}")
 
-# -------------------------------
-# Endpoint: Roof Type Classifier
-# -------------------------------
 @app.post("/roof/classify", tags=["Roof Type Classifier"])
 async def classify_roof(file: UploadFile = File(...)) -> Dict:
     try:
@@ -85,13 +64,5 @@ async def classify_roof(file: UploadFile = File(...)) -> Dict:
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Roof classification failed: {str(e)}")
 
-# -------------------------------
-# Auto-open Swagger UI
-# -------------------------------
-def open_browser():
-    webbrowser.open("http://127.0.0.1:8000/docs")
-
-if __name__ == "__main__":
-    threading.Timer(1.0, open_browser).start()
-    import uvicorn
-    uvicorn.run("main:app", host="127.0.0.1", port=8000, reload=True)
+# ✅ DO NOT add `if __name__ == "__main__"` block here.
+# Render will run `uvicorn main:app --host 0.0.0.0 --port 10000`
