@@ -2,11 +2,23 @@ import easyocr
 import cv2
 import numpy as np
 import re
+import easyocr
+import os
+from pathlib import Path
 
-reader = easyocr.Reader(['en'])
+# ✅ Use Hugging Face safe writable directory
+EASY_OCR_PATH = "/tmp/.easyocr_models"
+Path(EASY_OCR_PATH).mkdir(parents=True, exist_ok=True)
+
+# ✅ Tell EasyOCR to use this safe path for both models and user networks
+reader = easyocr.Reader(
+    ['en'],
+    model_storage_directory=EASY_OCR_PATH,
+    user_network_directory=EASY_OCR_PATH  # 👈 THIS is what you were missing
+)
+
 
 def preprocess_image(image):
-
     gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
     thresh = cv2.adaptiveThreshold(
         gray, 255,
@@ -16,8 +28,8 @@ def preprocess_image(image):
     )
     return thresh
 
-def extract_meter_info(image_bytes):
 
+def extract_meter_info(image_bytes):
     np_img = np.frombuffer(image_bytes, np.uint8)
     image = cv2.imdecode(np_img, cv2.IMREAD_COLOR)
     processed_image = preprocess_image(image)
@@ -26,7 +38,6 @@ def extract_meter_info(image_bytes):
     for bbox, text, conf in results:
         print(f"Text: {text}, Confidence: {conf:.2f}")
 
-
     extracted_info = {
         "kh": None,
         "frequency": None,
@@ -34,7 +45,6 @@ def extract_meter_info(image_bytes):
         "serial_number": None,
         "other_specs": []
     }
-
 
     kh_pattern = re.compile(r"\bK\s*H\s*[:=]?\s*([0-9.]+)", re.IGNORECASE)
     freq_pattern = re.compile(r"\b([4-6]0)\s*(hz)?\b", re.IGNORECASE)
